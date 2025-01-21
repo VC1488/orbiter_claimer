@@ -9,25 +9,14 @@ from loguru import logger
 from global_request import global_request
 from eth_abi import abi
 from retry import retry
+from data.claim_abi import CLAIM_ABI
 
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Инициализация AsyncWeb3
 web3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider("https://endpoints.omniatech.io/v1/arbitrum/one/public"))
-CLAIM_ABI = [
-    {
-        "name": "claim",
-        "type": "function",
-        "inputs": [
-            {"name": "userAddress", "type": "bytes32"},
-            {"name": "amount", "type": "uint256"},
-            {"name": "proof", "type": "bytes32[]"}
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    }
-]
+
 
 SEM_LIMIT = 1
 semaphore = asyncio.Semaphore(SEM_LIMIT)

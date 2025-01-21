@@ -11,8 +11,6 @@ MAX_RETRY = 4
 
 ERROR_CODE_EXCEPTION = -1
 ERROR_CODE_FAILED_REQUEST = -2
-
-# Загрузка прокси из файла при инициализации модуля
 PROXY_FILE = 'data/proxies.txt'
 proxies = []
 
@@ -25,34 +23,22 @@ else:
     logger.warning(f'Файл с прокси {PROXY_FILE} не найден. Продолжаем без прокси.')
 
 async def global_request(wallet, method="get", request_retry=0, need_sleep=False, **kwargs):
-    """
-    Выполняет HTTP-запрос с использованием случайного прокси из списка.
-
-    :param wallet: Идентификатор кошелька для логирования.
-    :param method: HTTP метод ('get', 'post', 'put', 'options').
-    :param request_retry: Текущий номер попытки.
-    :param need_sleep: Нужно ли делать паузу после запроса.
-    :param kwargs: Дополнительные параметры для запроса (url, headers, и т.д.).
-    :return: Кортеж (status_code, response_json).
-    """
     if request_retry > MAX_RETRY:
         return ERROR_CODE_FAILED_REQUEST, f"Max retries exceeded for {kwargs.get('url', 'unknown url')}"
 
-    # Выбор случайного прокси, если он не передан явно
     if 'proxy' not in kwargs or kwargs['proxy'] is None:
         if proxies:
             selected_proxy = choice(proxies)
             kwargs['proxy'] = selected_proxy
             logger.debug(f'Выбран прокси: {selected_proxy} для кошелька: {wallet}')
         else:
-            kwargs['proxy'] = None  # Прокси не используется
+            kwargs['proxy'] = None
 
     async with AsyncSession(verify=False) as session:
         retry_count = 0
 
         while retry_count <= MAX_RETRY:
             try:
-                # Выполнение запроса в зависимости от метода
                 if method.lower() == "post":
                     response = await session.post(**kwargs)
                 elif method.lower() == "get":
@@ -71,14 +57,12 @@ async def global_request(wallet, method="get", request_retry=0, need_sleep=False
                     if need_sleep:
                         await asyncio.sleep(timing)
                     try:
-                        # Пытаемся получить JSON-ответ асинхронно
                         response_json = await asyncio.to_thread(response.json)
                         return status_code, response_json
                     except json.decoder.JSONDecodeError:
                         logger.info('Запрос выполнен успешно, но не содержит JSON')
                         return status_code, {}
                 else:
-                    # Обработка различных статус-кодов
                     if status_code == 400:
                         try:
                             response_json = await asyncio.to_thread(response.json)
@@ -105,12 +89,11 @@ async def global_request(wallet, method="get", request_retry=0, need_sleep=False
                         return ERROR_CODE_FAILED_REQUEST, message
                     else:
                         if need_sleep:
-                            await asyncio.sleep(1)  # Короткая пауза перед повторной попыткой
+                            await asyncio.sleep(1)
             except ConnectionError as error:
                 logger.error(f'{wallet} - HTTPSConnectionPool - {kwargs.get("url", "")} не удалось выполнить запрос | {error}')
                 if need_sleep:
                     await asyncio.sleep(25)
-                # Рекурсивный вызов с увеличенным счетчиком попыток
                 return await global_request(wallet, method=method, request_retry=request_retry + 1, need_sleep=True, **kwargs)
             except Exception as error:
                 logger.error(f'{wallet} - {kwargs.get("url", "")} не удалось выполнить запрос | {error}')
